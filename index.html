@@ -1,0 +1,124 @@
+
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>百家樂 AI 預測</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    .btn { padding: 10px 20px; margin: 5px; font-size: 16px; }
+    #chart-container { width: 100%; max-width: 500px; margin-top: 20px; }
+    #history-list { margin-top: 20px; }
+    .history-item { padding: 4px 0; }
+  </style>
+</head>
+<body>
+  <h2>百家樂預測工具（AI版）</h2>
+  <p id="stats">勝率：莊 0% | 閒 0%</p>
+  <p id="suggestion">建議：請輸入結果</p>
+  <p id="ai-predict">AI 預測：無</p>
+  <p id="streak"></p>
+
+  <button class="btn" onclick="addResult('B')">輸入莊</button>
+  <button class="btn" onclick="addResult('P')">輸入閒</button>
+  <button class="btn" onclick="clearHistory()">清除紀錄</button>
+
+  <div id="chart-container">
+    <canvas id="resultChart"></canvas>
+  </div>
+
+  <div id="history-list">
+    <h3>歷史紀錄</h3>
+    <div id="record-list"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    let history = JSON.parse(localStorage.getItem("baccarat_history") || "[]");
+
+    function addResult(result) {
+      history.push(result);
+      localStorage.setItem("baccarat_history", JSON.stringify(history));
+      updateUI();
+    }
+
+    function clearHistory() {
+      history = [];
+      localStorage.removeItem("baccarat_history");
+      updateUI();
+    }
+
+    function aiPredict(history) {
+      if (history.length < 3) return { prediction: "無", confidence: 0 };
+      const last3 = history.slice(-3);
+      if (last3.every(r => r === 'B')) return { prediction: "閒", confidence: 0.7 };
+      if (last3.every(r => r === 'P')) return { prediction: "莊", confidence: 0.65 };
+      return { prediction: "無明顯趨勢", confidence: 0.5 };
+    }
+
+    function updateUI() {
+      const last10 = history.slice(-10);
+      const bCount = last10.filter(r => r === 'B').length;
+      const pCount = last10.filter(r => r === 'P').length;
+      const total = bCount + pCount;
+      const bRate = total ? (bCount / total * 100).toFixed(1) : 0;
+      const pRate = total ? (pCount / total * 100).toFixed(1) : 0;
+
+      document.getElementById("stats").innerText = `勝率：莊 ${bRate}% | 閒 ${pRate}%`;
+      document.getElementById("suggestion").innerText = total === 0 ? "建議：請輸入結果" :
+        (bRate > pRate ? "建議：押莊" : "建議：押閒");
+
+      let streak = 1;
+      for (let i = history.length - 2; i >= 0; i--) {
+        if (history[i] === history[history.length - 1]) streak++;
+        else break;
+      }
+      if (streak >= 3) {
+        const name = history[history.length - 1] === "B" ? "莊" : "閒";
+        document.getElementById("streak").innerText = `🎯 長龍警告：${name} 連出 ${streak} 次`;
+      } else {
+        document.getElementById("streak").innerText = "";
+      }
+
+      // AI 預測
+      const prediction = aiPredict(history);
+      document.getElementById("ai-predict").innerText = `AI 預測：${prediction.prediction}（信心值：${Math.round(prediction.confidence * 100)}%）`;
+
+      // 更新圖表
+      chart.data.datasets[0].data = [bRate, pRate];
+      chart.update();
+
+      // 更新歷史紀錄列表
+      const list = document.getElementById("record-list");
+      list.innerHTML = "";
+      history.forEach((r, idx) => {
+        const item = document.createElement("div");
+        item.className = "history-item";
+        item.innerText = `第 ${idx + 1} 局：${r === "B" ? "莊" : "閒"}`;
+        list.appendChild(item);
+      });
+    }
+
+    const ctx = document.getElementById("resultChart").getContext("2d");
+    const chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['莊', '閒'],
+        datasets: [{
+          label: '勝率 %',
+          data: [0, 0],
+          backgroundColor: ['#f44336', '#2196f3']
+        }]
+      },
+      options: {
+        scales: {
+          y: { beginAtZero: true, max: 100 }
+        }
+      }
+    });
+
+    updateUI();
+  </script>
+</body>
+</html>
